@@ -1,0 +1,87 @@
+! =============================================================
+! Clinic-Router-01 Configuration
+! Role: Core router — inter-VLAN routing + internet gateway
+! Device: Cisco 2911 (simulated in Packet Tracer)
+! =============================================================
+
+hostname Clinic-Router-01
+!
+! -- Security --
+enable secret 5 $1$HASH$PlaceholderHashOnly
+no ip http server
+no ip http secure-server
+service password-encryption
+!
+! -- Subinterfaces for inter-VLAN routing (Router-on-a-Stick) --
+! Each subinterface maps to one VLAN via 802.1Q encapsulation
+
+interface GigabitEthernet0/0
+ description Trunk to Core-Switch-01
+ no ip address
+ no shutdown
+!
+interface GigabitEthernet0/0.10
+ description VLAN 10 - Clinical Staff
+ encapsulation dot1Q 10
+ ip address 10.10.10.1 255.255.255.0
+!
+interface GigabitEthernet0/0.20
+ description VLAN 20 - Administrative / Billing
+ encapsulation dot1Q 20
+ ip address 10.10.20.1 255.255.255.0
+!
+interface GigabitEthernet0/0.30
+ description VLAN 30 - Guest / Patient Wi-Fi
+ encapsulation dot1Q 30
+ ip address 10.10.30.1 255.255.255.0
+!
+interface GigabitEthernet0/0.40
+ description VLAN 40 - Medical Devices (IoMT)
+ encapsulation dot1Q 40
+ ip address 10.10.40.1 255.255.255.0
+!
+interface GigabitEthernet0/0.99
+ description VLAN 99 - Management
+ encapsulation dot1Q 99 native
+ ip address 10.10.99.1 255.255.255.0
+!
+! -- WAN interface (simulated ISP uplink) --
+interface GigabitEthernet0/1
+ description WAN - ISP Uplink
+ ip address 203.0.113.2 255.255.255.252
+ ip nat outside
+ no shutdown
+!
+! -- NAT: only Clinical and Admin VLANs reach internet --
+! Guest and IoMT VLANs are blocked at ACL level (see below)
+ip nat inside source list NAT_ACL interface GigabitEthernet0/1 overload
+!
+ip access-list standard NAT_ACL
+ permit 10.10.10.0 0.0.0.255
+ permit 10.10.20.0 0.0.0.255
+!
+! -- Default route to ISP --
+ip route 0.0.0.0 0.0.0.0 203.0.113.1
+!
+! -- Access Control Lists --
+! HIPAA requires network segmentation: Guest VLAN cannot reach clinical systems
+
+ip access-list extended BLOCK_GUEST_TO_CLINICAL
+ deny   ip 10.10.30.0 0.0.0.255 10.10.10.0 0.0.0.255
+ deny   ip 10.10.30.0 0.0.0.255 10.10.20.0 0.0.0.255
+ deny   ip 10.10.30.0 0.0.0.255 10.10.40.0 0.0.0.255
+ permit ip any any
+!
+interface GigabitEthernet0/0.30
+ ip access-group BLOCK_GUEST_TO_CLINICAL in
+!
+! -- SSH access (management only — no Telnet) --
+ip domain-name clinic.local
+crypto key generate rsa modulus 2048
+ip ssh version 2
+!
+line vty 0 4
+ transport input ssh
+ login local
+!
+end
