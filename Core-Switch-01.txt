@@ -1,0 +1,82 @@
+! =============================================================
+! Core-Switch-01 Configuration
+! Role: Layer 2 core switch — VLAN segmentation + trunking
+! Device: Cisco Catalyst 2960 (simulated in Packet Tracer)
+! =============================================================
+
+hostname Core-Switch-01
+!
+enable secret 5 $1$HASH$PlaceholderHashOnly
+service password-encryption
+!
+! -- VLAN Definitions --
+vlan 10
+ name Clinical-Staff
+!
+vlan 20
+ name Administrative
+!
+vlan 30
+ name Guest-Patient-WiFi
+!
+vlan 40
+ name Medical-Devices-IoMT
+!
+vlan 99
+ name Management
+!
+! -- Trunk port to router (carries all VLANs) --
+interface GigabitEthernet0/1
+ description Trunk to Clinic-Router-01
+ switchport mode trunk
+ switchport trunk native vlan 99
+ switchport trunk allowed vlan 10,20,30,40,99
+ no shutdown
+!
+! -- Access ports: Clinical workstations (VLAN 10) --
+interface range FastEthernet0/1 - 8
+ description Clinical Workstation Ports
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+ no shutdown
+!
+! -- Access ports: Admin / Billing (VLAN 20) --
+interface range FastEthernet0/9 - 14
+ description Administrative Workstation Ports
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+ no shutdown
+!
+! -- Access ports: Medical Devices / IoMT (VLAN 40) --
+interface range FastEthernet0/15 - 20
+ description Medical Device Ports (IoMT)
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+ no shutdown
+!
+! -- Uplink to Wireless Access Point (Guest VLAN 30 tagged) --
+interface FastEthernet0/24
+ description Uplink to Wireless-AP-01
+ switchport mode trunk
+ switchport trunk allowed vlan 30
+ no shutdown
+!
+! -- Management interface --
+interface vlan 99
+ ip address 10.10.99.2 255.255.255.0
+ no shutdown
+!
+ip default-gateway 10.10.99.1
+!
+! -- SSH only --
+ip domain-name clinic.local
+ip ssh version 2
+!
+line vty 0 15
+ transport input ssh
+ login local
+!
+end
